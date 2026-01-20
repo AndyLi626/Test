@@ -1,34 +1,35 @@
 @echo off
-setlocal EnableExtensions EnableDelayedExpansion
+setlocal EnableExtensions
 
 set "MATCH_1=EnhancedRTPLPortfolioWorker"
 set "MATCH_2=ERTPLDailyWorker"
 
-REM log next to this bat
+REM Prefer log next to this bat
 set "LOG_DIR=%~dp0"
 
 for /f %%i in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd_HHmmss"') do set "TS=%%i"
 set "LOG_FILE=%LOG_DIR%StopErtplWorkers_%COMPUTERNAME%_%TS%.log"
 
-REM test write permission (this is the key)
-> "%LOG_FILE%" (
-  echo ==== StopErtplWorkers %date% %time% ====
-  echo ScriptDir: %LOG_DIR%
-  echo Match_1  : %MATCH_1%
-  echo Match_2  : %MATCH_2%
-) 2>nul
+REM Try create log in script folder
+> "%LOG_FILE%" echo ==== StopErtplWorkers %date% %time% ==== 2>nul
 
+REM If cannot write, fallback to TEMP (avoid hard failure)
 if not exist "%LOG_FILE%" (
-  echo [FATAL] Cannot create log in "%LOG_DIR%". No write permission or path not accessible.
-  exit /b 2
+  set "LOG_DIR=%TEMP%\"
+  set "LOG_FILE=%LOG_DIR%StopErtplWorkers_%COMPUTERNAME%_%TS%.log"
+  > "%LOG_FILE%" echo ==== StopErtplWorkers %date% %time% ====
+  echo [WARN] No write permission next to bat. Fallback log to: "%LOG_FILE%"
+) else (
+  echo [INFO] Log next to bat: "%LOG_FILE%"
 )
 
-REM find+kill using PowerShell CIM (no wmic)
-powershell -NoProfile -Command ^
-"$m1='%MATCH_1%'; $m2='%MATCH_2%';" ^
-"$ps=Get-CimInstance Win32_Process -Filter ""Name='java.exe'"" | Where-Object { $_.CommandLine -like ""*$m1*"" -or $_.CommandLine -like ""*$m2*"" };" ^
-"if(-not $ps){ 'NO_MATCH' } else { $ps | ForEach-Object { 'KILL PID='+$_.ProcessId; Stop-Process -Id $_.ProcessId -Force -ErrorAction Continue } }" ^
->> "%LOG_FILE%" 2>&1
+>> "%LOG_FILE%" echo ScriptDir: %~dp0
+>> "%LOG_FILE%" echo Match_1 : %MATCH_1%
+>> "%LOG_FILE%" echo Match_2 : %MATCH_2%
+>> "%LOG_FILE%" echo --------------------------------------------
 
-echo [INFO] Log: "%LOG_FILE%"
+REM Use PowerShell (CIM) to find java.exe whose CommandLine contains the match strings and kill
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$m1=$env:MATCH_1; $m2=$env:MATCH_2; $procs=Get-CimInstance Win32_Process -Filter \"Name='java.exe'\" | Where-Object { $_.CommandLine -and ($_.CommandLine -like ('*'+$m1+'*') -or $_.CommandLine -like ('*'+$m2+'*')) }; if(-not $procs){ 'NO_MATCH' } else { $procs | ForEach-Object { 'KILL PID='+$_.ProcessId+' CMD='+$_.CommandLine; try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop; 'KILLED PID='+$_.ProcessId } catch { 'FAILED PID='+$_.ProcessId+' ERR='+$_.Exception.Message } } }" >> "%LOG_FILE%" 2>&1
+
+echo [DONE] Log: "%LOG_FILE%"
 exit /b 0
