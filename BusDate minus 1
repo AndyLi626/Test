@@ -1,0 +1,37 @@
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+
+public class BusDateUtil {
+
+    /**
+     * Subtract 1 day from a business date string.
+     *
+     * @param busDate  date string (supports "yyyyMMdd" or "yyyy-MM-dd")
+     * @return         busDate - 1 day, in the same format as input
+     */
+    public static String minusOneDay(String busDate) {
+        if (busDate == null) {
+            throw new IllegalArgumentException("busDate is null");
+        }
+        String s = busDate.trim();
+
+        DateTimeFormatter fmt;
+        if (s.matches("\\d{8}")) {
+            fmt = DateTimeFormatter.BASIC_ISO_DATE; // yyyyMMdd
+        } else if (s.matches("\\d{4}-\\d{2}-\\d{2}")) {
+            fmt = DateTimeFormatter.ISO_LOCAL_DATE; // yyyy-MM-dd
+        } else {
+            throw new IllegalArgumentException("Unsupported busDate format: " + busDate +
+                    " (expected yyyyMMdd or yyyy-MM-dd)");
+        }
+
+        try {
+            LocalDate d = LocalDate.parse(s, fmt);
+            LocalDate d2 = d.minusDays(1);
+            return d2.format(fmt);
+        } catch (DateTimeParseException e) {
+            throw new IllegalArgumentException("Invalid busDate: " + busDate, e);
+        }
+    }
+}
