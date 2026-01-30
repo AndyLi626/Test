@@ -1,0 +1,58 @@
+DECLARE @d1 date = '2026-01-08';   -- 改成你的 1.08
+DECLARE @d2 date = '2026-01-09';   -- 改成你的 1.09
+DECLARE @eps decimal(18,6) = 0.00001;  -- 容差：按需要调，比如 0.00001 或 0.0001
+
+SELECT
+    a.positionId,
+    a.CID,
+    a.pnlValue AS pnl_d1,
+    b.pnlValue AS pnl_d2,
+    (b.pnlValue - a.pnlValue) AS pnl_diff
+FROM dbo.YourTable a
+JOIN dbo.YourTable b
+  ON a.positionId = b.positionId
+ AND a.CID = b.CID
+WHERE a.businessDate = @d1
+  AND b.businessDate = @d2
+  AND (
+        (a.pnlValue IS NULL AND b.pnlValue IS NOT NULL)
+     OR (a.pnlValue IS NOT NULL AND b.pnlValue IS NULL)
+     OR ABS(COALESCE(a.pnlValue,0) - COALESCE(b.pnlValue,0)) > @eps
+  )
+ORDER BY a.positionId, a.CID;
+
+
+
+
+
+
+DECLARE @d1 date = '2026-01-08';
+DECLARE @d2 date = '2026-01-09';
+
+SELECT a.positionId, a.CID
+FROM dbo.YourTable a
+LEFT JOIN dbo.YourTable b
+  ON a.positionId = b.positionId
+ AND a.CID = b.CID
+ AND b.businessDate = @d2
+WHERE a.businessDate = @d1
+  AND b.positionId IS NULL
+ORDER BY a.positionId, a.CID;
+
+
+
+
+SELECT b.positionId, b.CID
+FROM dbo.YourTable b
+LEFT JOIN dbo.YourTable a
+  ON a.positionId = b.positionId
+ AND a.CID = b.CID
+ AND a.businessDate = @d1
+WHERE b.businessDate = @d2
+  AND a.positionId IS NULL
+ORDER BY b.positionId, b.CID;
+
+
+
+
+
